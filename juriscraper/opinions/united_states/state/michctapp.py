@@ -37,6 +37,7 @@ class Site(ClusterSite, mich.Site):
 
         :return: None
         """
+        majority_versions = set()
         for item in self.html["searchItems"]:
             case_dict = await self._extract_case_data_from_item(item)
 
@@ -55,6 +56,24 @@ class Site(ClusterSite, mich.Site):
                 case_dict["type"] = OpinionType.CONCURRENCE.value
             else:
                 case_dict["type"] = OpinionType.MAJORITY.value
+
+            if case_dict["type"] == OpinionType.MAJORITY.value:
+                version_key = (
+                    case_dict["date"],
+                    case_dict["docket"],
+                    case_dict["name"],
+                    re.sub(
+                        r"\.opn\d+\.pdf$",
+                        ".opn.pdf",
+                        lower_url.rsplit("/", 1)[-1],
+                    ),
+                )
+                if version_key in majority_versions:
+                    logger.warning(
+                        "Skipping duplicate majority opinion version: %s", url
+                    )
+                    continue
+                majority_versions.add(version_key)
 
             # If we can't cluster it, append it to self.cases
             # if it was clustered, the data will already be in self.cases
