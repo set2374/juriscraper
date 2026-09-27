@@ -54,11 +54,13 @@ class Site(ny.Site):
                 r"<br>[\s\n]*(?P<docket_number>[A-Z0-9()/., -]*\d[A-Z0-9()/., -]*)[\s\n]*(<br>|DECISION, ORDER)"
             ),
         ]
+        # Normalize source labels before matching; a repeated "Index No." can
+        # otherwise prevent the whole docket from being extracted.
+        docket_text = ny.clean_repeated_docket_labels(
+            clean_string(scraped_text[:2500])
+        )
         for regex in regexes:
-            docket_match = regex.search(
-                # use clean_string to normalize html escaped values like '&amp;'
-                clean_string(scraped_text[:2500])
-            )
+            docket_match = regex.search(docket_text)
 
             if docket_match:
                 cleaned_docket = self.clean_docket_match(docket_match)
