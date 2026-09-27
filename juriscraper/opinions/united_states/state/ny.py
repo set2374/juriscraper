@@ -24,6 +24,16 @@ from juriscraper.lib.auth_utils import set_api_token_header
 from juriscraper.lib.judge_parsers import normalize_judge_string
 from juriscraper.OpinionSiteLinear import OpinionSiteLinear
 
+_REPEATED_DOCKET_LABEL = re.compile(
+    r"\b((?:Appeal|Case|Claim|Docket|File|Index|Ind\.?|Indictment|Motion|SCI)\s+No\.?)\s+(?=\1(?:\s|$))",
+    flags=re.IGNORECASE,
+)
+
+
+def clean_repeated_docket_labels(value: str) -> str:
+    """Remove an immediately repeated label without changing docket numbers."""
+    return _REPEATED_DOCKET_LABEL.sub("", value)
+
 
 class Site(OpinionSiteLinear):
     first_opinion_date = date(2003, 9, 25)
@@ -156,7 +166,7 @@ class Site(OpinionSiteLinear):
             slip_cite = slip_cite[0].strip() if slip_cite else ""
             official_citation = cells[4].text_content().strip()
             status = "Unpublished" if "(U)" in slip_cite else "Published"
-            docket = cells[2].text_content().strip()
+            docket = clean_repeated_docket_labels(cells[2].text_content().strip())
             author = cells[7].text_content().strip()
             case = {
                 "name": cells[0].text_content().strip(),
@@ -274,4 +284,6 @@ class Site(OpinionSiteLinear):
         """
         docket_number = match.group("docket_number")
         docket_number = re.sub(r"(\||\n|<br>)", "; ", docket_number)
-        return re.sub("[\\s\n]+", " ", docket_number.strip("; ()"))
+        return clean_repeated_docket_labels(
+            re.sub("[\\s\n]+", " ", docket_number.strip("; ()"))
+        )
