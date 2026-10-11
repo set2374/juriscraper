@@ -58,7 +58,27 @@ class Site(OpinionSiteLinear):
                 except (ValueError, AttributeError):
                     name, citation = short_title, ""
 
-            url = urljoin(self.url, link.get("href"))
+            heading = link.getparent()
+            siblings = list(heading.itersiblings())
+
+            # The court sometimes leaves a superseded PDF on the heading and
+            # publishes the current opinion in the immediately following
+            # paragraph. Prefer that native replacement when present, while
+            # retaining the heading URL for older entries.
+            opinion_href = link.get("href")
+            if siblings and siblings[0].tag == "p":
+                replacement_links = siblings[0].xpath(".//a[@href]")
+                for replacement_link in replacement_links:
+                    replacement_href = replacement_link.get("href")
+                    if (
+                        replacement_href.lower()
+                        .split("?", 1)[0]
+                        .endswith(".pdf")
+                    ):
+                        opinion_href = replacement_href
+                        break
+
+            url = urljoin(self.url, opinion_href)
             if url in seen_urls:
                 continue
             seen_urls.add(url)
@@ -67,9 +87,20 @@ class Site(OpinionSiteLinear):
             # "Whitehill, J. | June 3, 2026" #1992
             judge, case_date = "", ""
             date_filed_is_approximate = False
-            byline = link.xpath("../following-sibling::*[1][self::p]")
-            byline_text = byline[0].text_content().strip() if byline else ""
-            if match := byline_regex.search(byline_text):
+            byline_text = ""
+            match = None
+            for sibling in siblings:
+                if sibling.tag == "h2":
+                    break
+                if sibling.tag != "p":
+                    continue
+                candidate = sibling.text_content().strip()
+                if candidate_match := byline_regex.search(candidate):
+                    byline_text = candidate
+                    match = candidate_match
+                    break
+
+            if match:
                 judge = match.group("judge")
                 case_date = match.group("date")
             else:
