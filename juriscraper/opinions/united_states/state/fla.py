@@ -7,6 +7,8 @@ from math import ceil
 from typing import Any
 from urllib.parse import urljoin
 
+from typing_extensions import override
+
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.OpinionSiteLinear import OpinionSiteLinear
@@ -76,6 +78,7 @@ class Site(OpinionSiteLinear):
 
         return first_page
 
+    @override
     def _process_html(self) -> None:
         """Parses HTML into case dictionaries
 
@@ -99,10 +102,21 @@ class Site(OpinionSiteLinear):
                 logger.info("Skipping case with no name %s", fields)
                 continue
 
+            opinion = fields.get("opinion")
+            if not opinion:
+                # Some rows are orders by a clerk / judge, which have no
+                # opinion doc (3DCA 2022-0306). Others are opinions whose file
+                # is missing (2DCA 2024-0481)
+                logger.info(
+                    "Skipping case with no opinion file %s",
+                    fields["case_number"],
+                )
+                continue
+
             disposition = fields.get("disposition", "") or ""
             self.cases.append(
                 {
-                    "url": urljoin(self.base_url, fields["opinion"]["uri"]),
+                    "url": urljoin(self.base_url, opinion["uri"]),
                     "docket": self.get_docket_number(fields["case_number"]),
                     "name": titlecase(name),
                     "date": fields["disposition_date"]["date"]["date"].split(
