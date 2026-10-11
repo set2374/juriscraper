@@ -1,7 +1,7 @@
 """
-Scraper for the Supreme Court of Tennessee, Workers Compensation Panel
-CourtID: tenn
-Court Short Name: Tenn.
+Scraper for the Tennessee Workers' Compensation Appeals Board
+CourtID: tennworkcompapp
+Court Short Name: Tenn. Work. Comp. App. Bd.
 """
 
 import re
@@ -21,6 +21,7 @@ class Site(tenn.Site):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.court_id = "tennworkcompapp"
         self.url = "https://www.tncourts.gov/courts/work-comp/opinions"
         self.section_selector = (
             "views-field views-field-field-opinions-case-brief"
