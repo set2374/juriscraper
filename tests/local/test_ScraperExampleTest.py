@@ -27,6 +27,17 @@ class ScraperExampleTest(unittest.IsolatedAsyncioTestCase):
         # Re-enable logging
         logging.disable(logging.NOTSET)
 
+    def test_opinion_module_inventory_is_unique(self):
+        module_strings = build_module_list(
+            "juriscraper.opinions.united_states"
+        )
+
+        self.assertEqual(
+            len(module_strings),
+            len(set(module_strings)),
+            "Opinion package __all__ entries must identify each module once.",
+        )
+
     async def run_tests_on_module_str(self, module_str: str) -> None:
         """Finds all the $module_example* files and tests them with the sample
         scraper.
