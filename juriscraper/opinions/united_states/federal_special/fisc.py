@@ -1,5 +1,6 @@
 import re
 from datetime import date
+from typing import ClassVar
 from urllib.parse import unquote, urlencode, urljoin, urlparse
 
 from typing_extensions import override
@@ -23,9 +24,9 @@ class Site(OpinionSiteLinear):
     base_url = "https://www.intelligence.gov"
     court_base_url = "https://www.fisc.uscourts.gov"
     court_url = f"{court_base_url}/public-filings"
-    search_queries = ("FISC opinion", "FISC order")
+    search_queries: ClassVar[tuple[str, ...]] = ("FISC opinion", "FISC order")
     supplemental_records: tuple[dict[str, str | bool], ...] = ()
-    court_markers = ("fisc",)
+    court_markers: ClassVar[tuple[str, ...]] = ("fisc",)
     excluded_markers = (
         "fiscr",
         "fisc-r",
