@@ -7,23 +7,31 @@
 # Updated: 2025-09-01, luism: extract lower court information from text
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from typing_extensions import override
 
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.string_utils import normalize_dashes
-from juriscraper.lib.utils import (
-    PaginatedHtmlBackscrapeSite,
-    backscrape_over_paginated_results,
-)
+from juriscraper.lib.utils import PaginatedHtmlBackscrapeSite
 from juriscraper.OpinionSiteLinear import OpinionSiteLinear
 
 
 class Site(OpinionSiteLinear, PaginatedHtmlBackscrapeSite[Any]):
-    base_url = "https://www.ndcourts.gov/"
+    # Index: https://www.ndcourts.gov/supreme-court/opinions
+    legacy_base_url = "https://www.ndcourts.gov/"
+    base_url = (
+        "https://portal-api.ctrack.ndcourts.gov/"
+        "courts/cms/docketentrydocuments"
+    )
+    document_url = (
+        "https://portal-api.ctrack.ndcourts.gov/courts/{court}/cms/case/"
+        "{case}/docketentrydocuments/{document}"
+    )
+    court_uuid = "68f021c4-6a44-4735-9a76-5360b2e8af13"
+    opinion_type_id = "1000057"
     ordered_fields = [
         "citation",
         "name",
@@ -32,22 +40,115 @@ class Site(OpinionSiteLinear, PaginatedHtmlBackscrapeSite[Any]):
         "nature_of_suit",
         "judge",
     ]
-    first_opinion_date = datetime(1955, 10, 25)
-    # Ensure the backscrape iterable has a single item
-    days_interval = (datetime.today() - first_opinion_date).days + 2
+    # The public CTrack appellate system launched April 8, 2024. Older
+    # opinions remain covered by the dedicated North Dakota backscraper.
+    first_opinion_date = datetime(2024, 4, 8)
+    days_interval = 30
     name_regex = re.compile(r"^(.*?)(\s*(\d{4}\sND\s\d+))\s*$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.court_id = self.__module__
-        self.url = "https://www.ndcourts.gov/supreme-court/opinions?topic=&author=&searchQuery=&trialJudge=&pageSize=100&sortOrder=1"
         self.status = "Published"
+        self.page_size = 200
+        self.document_case_indexes: dict[str, int] = {}
+        self.document_dockets: dict[str, set[str]] = {}
+        today = date.today()
+        self.set_url(0, today - timedelta(days=self.days_interval), today)
+        self.request["headers"].update(
+            {
+                "Accept": "application/json",
+                "Referer": "https://portal.ctrack.ndcourts.gov/",
+            }
+        )
+        self.expected_content_types = ["application/pdf"]
         self.make_backscrape_iterable(kwargs)
         self.should_have_results = True
 
+    def set_url(
+        self,
+        page: int = 0,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> None:
+        """Build a public CTrack opinion-document search URL."""
+        params = {
+            "docketEntryHeader.docketEntryTypeID": self.opinion_type_id,
+            "caseHeader.courtID": self.court_uuid,
+            "page": page,
+            "size": self.page_size,
+            "sort": "docketEntryHeader.filedDate,desc",
+        }
+        if start is not None:
+            params["docketEntryHeader.docketEntryFiledDateFrom"] = (
+                f"{start.isoformat()}T00:00:00.000Z"
+            )
+        if end is not None:
+            params["docketEntryHeader.docketEntryFiledDateTo"] = (
+                f"{(end + timedelta(days=1)).isoformat()}T00:00:00.000Z"
+            )
+        self.url = f"{self.base_url}?{urlencode(params)}"
+
     @override
     async def _process_html(self) -> None:
-        """Most values are inside a <p>: whitespace and
+        if isinstance(self.html, dict):
+            self._process_ctrack_results()
+            return
+
+        self._process_legacy_html()
+
+    def _process_ctrack_results(self) -> None:
+        """Build cases from the court's public CTrack document feed."""
+        if not isinstance(self.html, dict):
+            raise TypeError("CTrack response must be a JSON object")
+
+        for result in self.html.get("_embedded", {}).get("results", []):
+            entry = result["docketEntryHeader"]
+            header = result["caseHeader"]
+            if entry.get("securedDocument"):
+                logger.warning(
+                    "%s: skipping secured document for docket %s",
+                    self.court_id,
+                    header["caseNumber"],
+                )
+                continue
+
+            document_id = result["documentLinkUUID"]
+            docket = header["caseNumber"]
+            if document_id in self.document_case_indexes:
+                self.document_dockets[document_id].add(docket)
+                case_index = self.document_case_indexes[document_id]
+                self.cases[case_index]["docket"] = ", ".join(
+                    sorted(self.document_dockets[document_id])
+                )
+                continue
+
+            case_index = len(self.cases)
+            self.document_case_indexes[document_id] = case_index
+            self.document_dockets[document_id] = {docket}
+            self.cases.append(
+                {
+                    "date": entry["filedDate"][:10],
+                    "per_curiam": False,
+                    "author": "",
+                    "judge": "",
+                    "summary": "",
+                    "name": header["caseTitle"].strip(),
+                    "citation": "",
+                    "docket": docket,
+                    "nature_of_suit": header.get("caseCategory", ""),
+                    "url": self.document_url.format(
+                        court=self.court_uuid,
+                        case=header["caseInstanceUUID"],
+                        document=document_id,
+                    ),
+                }
+            )
+
+    def _process_legacy_html(self) -> None:
+        """Parse the retired HTML listing retained in historical fixtures.
+
+        Most values are inside a <p>: whitespace and
         field names need to be cleaned
 
         Citation used to be available, now must be got from inside
@@ -70,7 +171,7 @@ class Site(OpinionSiteLinear, PaginatedHtmlBackscrapeSite[Any]):
 
             # Do the URL check
             url = urljoin(
-                self.base_url,
+                self.legacy_base_url,
                 onclick[0].split("'")[1],
             )
             if url in seen_urls:
@@ -216,17 +317,17 @@ class Site(OpinionSiteLinear, PaginatedHtmlBackscrapeSite[Any]):
         return metadata
 
     async def _download_backwards(self, dates: tuple[date, date]) -> None:
-        """Make custom date range request
-
-        :param dates: (start_date, end_date) tuple
-        :return None
-        """
+        """Page through the CTrack feed for a requested date window."""
         logger.info("Backscraping for range %s %s", *dates)
         start, end = dates
-        # last page is 118 (August 2024)
-        last_page = 130
-        base_url = self.url
-        url_template = f"{base_url}&page={{}}"
-        self.cases = await backscrape_over_paginated_results(
-            2, last_page, start, end, "%m/%d/%Y", self, None, url_template
-        )
+        page = 0
+        while True:
+            self.set_url(page, start, end)
+            self.html = await self._download()
+            results = self.html.get("_embedded", {}).get("results", [])
+            if not results:
+                break
+            await self._process_html()
+            page += 1
+            if page >= self.html.get("page", {}).get("totalPages", 0):
+                break

@@ -1,0 +1,222 @@
+{
+  "_embedded": {
+    "results": [
+      {
+        "documentLinkUUID": "3020b2c9-5001-4e3a-9647-e8217985fdf3",
+        "documentName": "Opinion - Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:34:27.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "efb72947-2ad0-41d5-afa9-67a42f51aff2",
+          "caseNumber": "20260298",
+          "caseTitle": "Vacancy in Judgeship No. 3, ECJD",
+          "caseCategory": "Judicial Administration",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "74ec01b4-0df7-4049-b766-e8a7a20c91a5",
+        "documentName": "20260018_State-v-Snedaker_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:17:50.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "95b6dc5c-50dd-4962-8877-e89f08a947ec",
+          "caseNumber": "20260019",
+          "caseTitle": "State v. Snedaker",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "74ec01b4-0df7-4049-b766-e8a7a20c91a5",
+        "documentName": "20260018_State-v-Snedaker_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:17:50.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "6377e845-a25e-498b-adef-683d7c09cf00",
+          "caseNumber": "20260018",
+          "caseTitle": "State v. Snedaker",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "f089871c-d4b8-4430-b7bd-055d5aaf10e1",
+        "documentName": "20260012_DCI-Credit-v-Coon_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:13:46.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "3d3f0e02-320f-48c5-b062-67bd65994df2",
+          "caseNumber": "20260012",
+          "caseTitle": "DCI Credit Services v. Coon",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "e0e7fe59-6319-4f30-b5f1-044d60ee630c",
+        "documentName": "20260092_Whitetail-v-State_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:13:40.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "b10f9dc5-bb51-48db-a92e-715e71b51c6a",
+          "caseNumber": "20260092",
+          "caseTitle": "Whitetail v. State",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "41021a07-81c9-426c-b1ca-84ee4dd4fb9e",
+        "documentName": "20260106_AAA Collections-v-Rossillo_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:11:05.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "ee55c605-9229-4e1e-b2c3-206293a596f9",
+          "caseNumber": "20260106",
+          "caseTitle": "AAA Collections v. Rossillo",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "14369cd6-60d8-4ae3-aa29-9fc9b4f61edc",
+        "documentName": "20260100_Skeen-v-State_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:07:30.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "ad0c8e39-9710-45e2-9e0f-4590262937f8",
+          "caseNumber": "20260100",
+          "caseTitle": "Skeen v. State",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "c9c93199-635c-4cde-8872-80b6f1d5a791",
+        "documentName": "20260101_Norwood-v-State_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:07:07.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "859d4fcb-43be-4849-8d18-eda92c515767",
+          "caseNumber": "20260101",
+          "caseTitle": "Norwood v. State",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "f456fe98-21cc-4f11-8b65-48ef6157d739",
+        "documentName": "20260137_Sanderson-v-Walsh-Cnty-Comm'rs_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:02:33.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "493cad62-11b8-4ee7-8221-f9289ad64dbc",
+          "caseNumber": "20260137",
+          "caseTitle": "Sanderson v. Walsh Co. Commissioners, et al.",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      },
+      {
+        "documentLinkUUID": "ecbd37e3-ee72-4c6f-9b62-6ec2a6e2dcbf",
+        "documentName": "20260081_Interest-of-Hicks_Opinion",
+        "docketEntryHeader": {
+          "filedDate": "2026-10-01T13:00:04.000+00:00",
+          "docketEntryType": "Opinion",
+          "docketEntryTypeID": "1000057",
+          "docketEntrySubTypeID": "1000260",
+          "docketEntryDescription": "Opinion - Opinion",
+          "official": true,
+          "securedDocument": false
+        },
+        "caseHeader": {
+          "caseInstanceUUID": "8a33a151-4f03-4431-bba3-870778e1d702",
+          "caseNumber": "20260081",
+          "caseTitle": "Interest of Hicks",
+          "caseCategory": "Appeal",
+          "courtID": "1",
+          "courtAbbreviation": "North Dakota Supreme Court"
+        }
+      }
+    ]
+  },
+  "page": {
+    "size": 200,
+    "totalElements": 10,
+    "totalPages": 1,
+    "number": 0
+  }
+}
