@@ -1822,20 +1822,6 @@
     },
     {
       "column": 20,
-      "path": "juriscraper/opinions/united_states/state/wis.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `xpath`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
-      "path": "juriscraper/opinions/united_states/state/wisctapp.py",
-      "name": "missing-attribute",
-      "concise_description": "Object of class `NoneType` has no attribute `xpath`",
-      "severity": "error"
-    },
-    {
-      "column": 20,
       "path": "juriscraper/opinions/united_states/state/wva.py",
       "name": "missing-attribute",
       "concise_description": "Object of class `NoneType` has no attribute `xpath`",

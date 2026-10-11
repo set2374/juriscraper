@@ -11,7 +11,8 @@ class Site(wis.Site):
         super().__init__(*args, **kwargs)
         self.court_id = self.__module__
         self.base_url = "https://www.wicourts.gov/other/appeals/caopin.jsp"
-        self.set_url()
+        self.feed_url = "https://www.wicourts.gov/rss/caopin.jsp"
+        self.url = self.feed_url
         self.cite_regex = r"20\d{2}\sWI App\s\d+"
 
     def combine_opinions(self, url: str, docket_number: str) -> bool:
@@ -31,12 +32,12 @@ class Site(wis.Site):
         return False
 
     @override
-    def _process_html(self) -> None:
+    def _process_opinion_rows(self, html) -> None:
         """Process Wisconsin Ct of Appeals rows
 
         :return: None
         """
-        for row in self.html.xpath(".//table/tbody/tr"):
+        for row in html.xpath(".//table/tbody/tr | self::table/tbody/tr"):
             date, docket, caption, district, county, link = row.xpath("./td")
             long_caption = caption.text_content()
             if "[Decision/Opinion withdrawn" in long_caption:
