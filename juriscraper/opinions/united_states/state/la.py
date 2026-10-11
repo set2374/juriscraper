@@ -270,13 +270,15 @@ class Site(OpinionSiteLinear):
             except json.JSONDecodeError:
                 continue
             if data.get("type") == "server":
-                markers.append(
-                    {
-                        "type": data["type"],
-                        "sequence": data["sequence"],
-                        "descriptor": data["descriptor"],
-                    }
-                )
+                # Match the browser's ComponentDescriptorDiscovery path:
+                # StartCircuit receives the complete start marker, plus the
+                # traversal-assigned uniqueId.  Newer Blazor releases add a
+                # component key and prerenderId that the server uses to bind
+                # the descriptor to the rendered root.  Dropping them starts
+                # a circuit that never produces the opinion render batch.
+                data["uniqueId"] = len(markers)
+                markers.append(data)
+        markers.sort(key=lambda item: item["sequence"])
         state_match = re.search(
             r"<!--Blazor-Server-Component-State:(.*?)-->", raw, re.S
         )
