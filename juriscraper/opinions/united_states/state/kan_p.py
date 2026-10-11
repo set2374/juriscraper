@@ -7,7 +7,7 @@ Court Contact:
 History:
  - 2025-06-09: Created.
  - 2026-03-19: Refactored from WebDriven to OpinionSiteLinear. grossir
-    Use urllib to fix block
+ - 2026-10-11: Restored the native HTTP client so configured proxy egress is honored.
     Added backscraper
  - 2026-04-02: Split into kan_p and kan_u by status. grossir
 """
@@ -29,9 +29,10 @@ class Site(OpinionSiteLinear):
     status = "Published"
     first_opinion_date = date(2015, 1, 1)
     days_interval = 30
-    use_urllib = True
 
     def __init__(self, *args, **kwargs):
+        # These publishers return a Cloudflare 403 over HTTP/2.
+        kwargs.setdefault("http2", False)
         super().__init__(*args, **kwargs)
         self.court_id = self.__module__
         today = date.today()

@@ -4,6 +4,7 @@ Court Short Name: North Carolina Business Court
 Author: Kevin Ramirez
 History:
     2025-05-06, quevon24: First version
+    2026-10-11: Use native HTTP client so configured proxy egress is honored.
 """
 
 import re
@@ -18,7 +19,6 @@ from juriscraper.OpinionSiteLinear import OpinionSiteLinear
 
 class Site(OpinionSiteLinear):
     days_interval = 7
-    use_urllib = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
