@@ -18,6 +18,7 @@ from urllib.parse import urljoin
 
 import nh3
 from lxml.html import fromstring, tostring
+from typing_extensions import override
 
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.auth_utils import set_api_token_header
@@ -127,7 +128,8 @@ class Site(OpinionSiteLinear):
         self.url = action_url
         return await super()._download(request_dict)
 
-    def _process_html(self):
+    @override
+    def _process_html(self) -> None:
         table = self.html.xpath('.//table[contains(@class, "table")]')
         if not table:
             logger.warning("No results table found.")
@@ -166,7 +168,9 @@ class Site(OpinionSiteLinear):
             slip_cite = slip_cite[0].strip() if slip_cite else ""
             official_citation = cells[4].text_content().strip()
             status = "Unpublished" if "(U)" in slip_cite else "Published"
-            docket = clean_repeated_docket_labels(cells[2].text_content().strip())
+            docket = clean_repeated_docket_labels(
+                cells[2].text_content().strip()
+            )
             author = cells[7].text_content().strip()
             case = {
                 "name": cells[0].text_content().strip(),
