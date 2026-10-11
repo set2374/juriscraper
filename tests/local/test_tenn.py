@@ -12,7 +12,12 @@ class TennesseePendingDocumentTest(unittest.TestCase):
     def test_workers_compensation_uses_its_native_court_identity(self):
         site = TennesseeWorkersCompSite()
 
-        self.assertEqual(site.court_id, "tennworkcompapp")
+        self.assertEqual(
+            site.court_id,
+            "juriscraper.opinions.united_states.state.tennworkcompapp",
+        )
+        self.assertEqual(site.court_id.split(".")[1], "opinions")
+        self.assertEqual(site.court_id.rsplit(".", 1)[-1], "tennworkcompapp")
 
     def test_row_without_document_url_is_deferred(self):
         site = Site()

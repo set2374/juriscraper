@@ -21,7 +21,10 @@ class Site(tenn.Site):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.court_id = "tennworkcompapp"
+        self.court_id = (
+            "juriscraper.opinions.united_states.state."
+            "tennworkcompapp"
+        )
         self.url = "https://www.tncourts.gov/courts/work-comp/opinions"
         self.section_selector = (
             "views-field views-field-field-opinions-case-brief"
