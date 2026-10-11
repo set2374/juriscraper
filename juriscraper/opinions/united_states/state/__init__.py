@@ -118,7 +118,6 @@ __all__ = [
     "njsuperctappdiv_u",
     "njtaxct_p",
     "njtaxct_u",
-    "njsuperctappdiv_u",
     "ny",
     "nyag",
     "nyappdiv_1st",
