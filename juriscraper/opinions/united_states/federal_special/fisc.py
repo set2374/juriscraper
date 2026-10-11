@@ -11,17 +11,18 @@ from juriscraper.OpinionSiteLinear import OpinionSiteLinear
 
 
 class Site(OpinionSiteLinear):
-    """Foreign Intelligence Surveillance Court public opinions.
+    """Foreign Intelligence Surveillance Court public decisions.
 
-    The court's public-filings page rejects the source-engine host and the
-    provider corpus stops in 2016. The Intelligence Community's official
-    declassification database publishes the same public decisions through a
-    paginated search and is reachable from the source-engine host. Follow its
-    indexed court documents and release records, excluding procedures,
-    assessments, pleadings, and Court of Review decisions.
+    The court's public-filings table is the authoritative source for opinions
+    and orders published there since June 2013. The Intelligence Community's
+    declassification archive supplies certification decisions and older
+    records that are absent from the court table. Conserve the union while
+    preferring court metadata when both sources publish the same decision.
     """
 
     base_url = "https://www.intelligence.gov"
+    court_base_url = "https://www.fisc.uscourts.gov"
+    court_url = f"{court_base_url}/public-filings"
     search_queries = ("FISC opinion", "FISC order")
     supplemental_records: tuple[dict[str, str | bool], ...] = ()
     court_markers = ("fisc",)
@@ -44,6 +45,25 @@ class Site(OpinionSiteLinear):
         "procedures",
         "report",
         "statement",
+        "transcript",
+    )
+    excluded_court_title_markers = (
+        "application",
+        "assessment",
+        "brief",
+        "certificate",
+        "certification",
+        "declaration",
+        "implementation",
+        "letter",
+        "motion",
+        "notice",
+        "petition",
+        "procedures",
+        "report",
+        "response",
+        "statement",
+        "submission",
         "transcript",
     )
     full_date_re = re.compile(
@@ -74,7 +94,11 @@ class Site(OpinionSiteLinear):
         super().__init__(*args, **kwargs)
         self.court_id = self.__module__
         self.status = "Published"
-        self.url = self._search_url(self.search_queries[0])
+        self.url = self.court_url
+        # The archive serves PDFs to its truthful Juriscraper identity but
+        # returns a 403 HTML page to the generic download User-Agent.
+        self.needs_special_headers = True
+        self.request["headers"]["User-Agent"] = self.user_agent
         self.should_have_results = True
 
     def _search_url(self, query: str) -> str:
@@ -86,30 +110,37 @@ class Site(OpinionSiteLinear):
     @override
     async def _download(self, request_dict=None):
         if self.test_mode_enabled():
-            # Retain compatibility with the historical court-page fixture.
             return await OpinionSiteLinear._download(self, request_dict)
 
-        records = []
-        seen_urls = set()
+        records: list[dict] = []
+        seen_urls: set[str] = set()
+        seen_pages: set[str] = set()
+        page_url = self.court_url
         first_page = True
+
+        while page_url and page_url not in seen_pages:
+            seen_pages.add(page_url)
+            if first_page:
+                page = await OpinionSiteLinear._download(self, request_dict)
+                first_page = False
+            else:
+                page = await self._get_html_tree_by_url(page_url)
+            self._collect_court_page(page, records, seen_urls)
+            next_urls = page.xpath("//a[@title='Go to next page']/@href")
+            page_url = urljoin(page_url, next_urls[0]) if next_urls else ""
+
         for query in self.search_queries:
             page_url = self._search_url(query)
-            while page_url:
-                if first_page:
-                    self.url = page_url
-                    page = await OpinionSiteLinear._download(
-                        self, request_dict
-                    )
-                    first_page = False
-                else:
-                    page = await self._get_html_tree_by_url(page_url)
+            seen_search_pages: set[str] = set()
+            while page_url and page_url not in seen_search_pages:
+                seen_search_pages.add(page_url)
+                page = await self._get_html_tree_by_url(page_url)
                 await self._collect_search_page(page, records, seen_urls)
                 next_urls = page.xpath(
                     "//a[@aria-label='Go to next page']/@href"
                 )
-                page_url = next_urls[0] if next_urls else ""
-        self._append_supplemental_records(records, seen_urls)
-        return records
+                page_url = urljoin(page_url, next_urls[0]) if next_urls else ""
+        return self._deduplicate_records(records)
 
     def _append_supplemental_records(
         self,
@@ -123,6 +154,51 @@ class Site(OpinionSiteLinear):
                 continue
             seen_urls.add(url)
             records.append({**record, "url": url})
+
+    def _collect_court_page(
+        self,
+        page,
+        records: list[dict],
+        seen_urls: set[str],
+    ) -> None:
+        """Collect judicial decisions from the court's native table."""
+        for row in page.xpath("//table//tbody/tr"):
+            cells = row.xpath("./td")
+            if len(cells) < 5:
+                continue
+
+            date_text = " ".join(cells[0].text_content().split())
+            title = " ".join(cells[2].text_content().split())
+            docket = " ".join(cells[3].text_content().split())
+            file_name = " ".join(cells[4].text_content().split())
+            file_links = cells[4].xpath(".//a/@href")
+            if not file_links or not self._court_record_belongs_to_court(
+                title, docket, file_name
+            ):
+                continue
+
+            opinion_url = self._canonical_opinion_url(
+                urljoin(self.court_url, file_links[-1])
+            )
+            if opinion_url in seen_urls or not self._is_official_court_pdf(
+                opinion_url
+            ):
+                continue
+
+            date_filed = convert_date_string(date_text)
+            if date_filed is None or date_filed > date.today():
+                continue
+
+            seen_urls.add(opinion_url)
+            records.append(
+                {
+                    "date": date_filed.isoformat(),
+                    "date_filed_is_approximate": False,
+                    "docket": docket,
+                    "name": title,
+                    "url": opinion_url,
+                }
+            )
 
     async def _collect_search_page(
         self,
@@ -241,27 +317,9 @@ class Site(OpinionSiteLinear):
             self.cases.extend(self.html)
             return
 
-        # Historical fixture and emergency compatibility with the court page.
-        for row in self.html.xpath("//tr[td/a]"):
-            links = row.xpath("td/a/text()")
-            if len(links) < 2:
-                continue
-            filing_name, filename = links[0], links[-1]
-            if "opinion" not in filing_name.casefold():
-                continue
-            docket = row.xpath("string(td[4])").strip()
-            if not self._legacy_record_belongs_to_court(docket, filename):
-                continue
-            date_text = row.xpath("string(td[1])").strip()
-            opinion_url = urljoin(self.url, row.xpath(".//a/@href")[-1])
-            self.cases.append(
-                {
-                    "date": date_text,
-                    "docket": docket,
-                    "name": filing_name,
-                    "url": opinion_url,
-                }
-            )
+        records: list[dict] = []
+        self._collect_court_page(self.html, records, set())
+        self.cases.extend(records)
 
     def _belongs_to_court(self, text: str) -> bool:
         normalized = text.casefold()
@@ -320,6 +378,79 @@ class Site(OpinionSiteLinear):
             marker in normalized for marker in self.excluded_markers
         )
 
+    def _court_record_belongs_to_court(
+        self, title: str, docket: str, filename: str
+    ) -> bool:
+        """Distinguish judicial decisions from filings citing decisions."""
+        normalized_title = title.casefold()
+        decision_positions = [
+            normalized_title.find(marker)
+            for marker in self.decision_markers
+            if marker in normalized_title
+        ]
+        if not decision_positions:
+            return False
+        excluded_positions = [
+            normalized_title.find(marker)
+            for marker in self.excluded_court_title_markers
+            if marker in normalized_title
+        ]
+        return (
+            not excluded_positions
+            or min(decision_positions) < min(excluded_positions)
+        ) and self._legacy_record_belongs_to_court(docket, filename)
+
+    @classmethod
+    def _is_official_court_pdf(cls, url: str) -> bool:
+        parsed = urlparse(url)
+        return (
+            parsed.scheme == "https"
+            and parsed.netloc.casefold()
+            in {"fisc.uscourts.gov", "www.fisc.uscourts.gov"}
+            and parsed.path.casefold().startswith("/sites/default/files/")
+            and parsed.path.casefold().endswith(".pdf")
+        )
+
+    @classmethod
+    def _deduplicate_records(cls, records: list[dict]) -> list[dict]:
+        """Prefer court metadata and conserve each official document once."""
+        deduplicated: list[dict] = []
+        seen_urls: set[str] = set()
+        seen_filenames: set[str] = set()
+        court_signatures: set[tuple[str, tuple[str, ...]]] = set()
+
+        for record in records:
+            url = cls._canonical_opinion_url(str(record["url"]))
+            parsed = urlparse(url)
+            normalized_filename = re.sub(
+                r"[^a-z0-9]+",
+                "",
+                unquote(parsed.path.rsplit("/", 1)[-1]).casefold(),
+            )
+            name = str(record.get("name", "")).casefold()
+            kinds = tuple(
+                marker for marker in cls.decision_markers if marker in name
+            )
+            signature = (str(record.get("date", "")), kinds)
+            is_court_record = parsed.netloc.casefold() in {
+                "fisc.uscourts.gov",
+                "www.fisc.uscourts.gov",
+            }
+
+            if url in seen_urls or normalized_filename in seen_filenames:
+                continue
+            if not is_court_record and kinds and signature in court_signatures:
+                continue
+
+            record["url"] = url
+            deduplicated.append(record)
+            seen_urls.add(url)
+            seen_filenames.add(normalized_filename)
+            if is_court_record and kinds:
+                court_signatures.add(signature)
+
+        return deduplicated
+
     def _append_record(
         self,
         records: list[dict],
@@ -368,6 +499,8 @@ class Site(OpinionSiteLinear):
         host = parsed.netloc.casefold()
         if host in {"intel.gov", "www.intel.gov", "intelligence.gov"}:
             return parsed._replace(netloc="www.intelligence.gov").geturl()
+        if host == "fisc.uscourts.gov":
+            return parsed._replace(netloc="www.fisc.uscourts.gov").geturl()
         return url
 
     @classmethod
