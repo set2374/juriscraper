@@ -1,7 +1,8 @@
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 
 import httpx
+from lxml import html
 
 from juriscraper.opinions.united_states.federal_special import fisc, fiscr
 
@@ -119,28 +120,6 @@ def test_duplicate_release_links_are_conserved_once():
     assert records[0]["date_filed_is_approximate"] is False
 
 
-def test_verified_fiscr_supplements_preserve_dockets_and_deduplicate():
-    site = fiscr.Site()
-    duplicate_url = site.supplemental_records[0]["url"]
-    records = [{"url": duplicate_url, "name": "existing"}]
-    seen = {duplicate_url}
-
-    site._append_supplemental_records(records, seen)
-
-    assert len(records) == len(site.supplemental_records)
-    supplements = records[1:]
-    assert {record["docket"] for record in supplements} == {
-        "FISCR 18-01",
-        "FISCR 20-01",
-        "FISCR Misc. 20-02",
-    }
-    assert all(
-        record["date_filed_is_approximate"] is False
-        for record in supplements
-    )
-    assert len({record["url"] for record in records}) == len(records)
-
-
 def test_image_only_release_link_uses_official_filename_as_name():
     site = fisc.Site()
     records = []
@@ -241,6 +220,13 @@ def test_official_search_paginates_and_filters_documents():
     </body></html>"""
 
     def handler(request):
+        assert request.headers["user-agent"] == "Juriscraper"
+        if request.url.path == "/public-filings":
+            return httpx.Response(
+                200,
+                text="<html><body><table><tbody></tbody></table></body></html>",
+                request=request,
+            )
         if request.url.path.endswith("/advanced-search"):
             body = (
                 second_page if request.url.params.get("start") else first_page
@@ -305,3 +291,235 @@ def test_official_search_paginates_and_filters_documents():
         date(2021, 9, 2),
     )
     assert site.date_filed_is_approximate == (False, True, False)
+
+
+def _court_row(
+    filed: str,
+    title: str,
+    docket: str,
+    filename: str,
+    url: str,
+) -> str:
+    return f"""
+      <tr>
+        <td>{filed}</td><td>Mon, 07/07/2025</td>
+        <td><a href="/public-filings/item">{title}</a></td>
+        <td>{docket}</td>
+        <td><a href="{url}">{filename}</a></td>
+      </tr>
+    """
+
+
+def _court_page(*rows: str, next_url: str = "") -> str:
+    pager = (
+        f'<a title="Go to next page" href="{next_url}">next</a>'
+        if next_url
+        else ""
+    )
+    return (
+        f"<html><body><table><tbody>{''.join(rows)}</tbody></table>"
+        f"{pager}</body></html>"
+    )
+
+
+def test_court_records_are_separated_and_party_filings_are_excluded():
+    fisc_site = fisc.Site()
+    fiscr_site = fiscr.Site()
+
+    assert fisc_site._court_record_belongs_to_court(
+        "Opinion and Order", "Misc. 19-02", "FISC Opinion.pdf"
+    )
+    assert not fisc_site._court_record_belongs_to_court(
+        "Opinion", "FISCR 20-01", "FISCR Opinion.pdf"
+    )
+    assert fiscr_site._court_record_belongs_to_court(
+        "Opinion", "FISCR 20-01", "FISCR Opinion.pdf"
+    )
+    assert not fiscr_site._court_record_belongs_to_court(
+        "Opinion and Order", "Misc. 19-02", "FISC Opinion.pdf"
+    )
+    assert not fisc_site._court_record_belongs_to_court(
+        "Motion for Relief from the Court's March 5, 2020 Order",
+        "Misc. 19-02",
+        "Motion.pdf",
+    )
+    assert not fisc_site._court_record_belongs_to_court(
+        "Supplemental Response to the Court's Opinion and Order",
+        "Misc. 19-02",
+        "Response.pdf",
+    )
+    assert fisc_site._court_record_belongs_to_court(
+        "Order Respecting Disclosure in Response to Pending Requests",
+        "16-1182",
+        "Order Respecting Disclosure.pdf",
+    )
+
+
+def test_only_direct_official_court_pdf_urls_are_accepted():
+    assert fisc.Site._is_official_court_pdf(
+        "https://www.fisc.uscourts.gov/sites/default/files/Opinion.pdf"
+    )
+    assert fisc.Site._is_official_court_pdf(
+        "https://fisc.uscourts.gov/sites/default/files/Order.PDF"
+    )
+    assert not fisc.Site._is_official_court_pdf(
+        "https://www.intelligence.gov/assets/FISC_Opinion.pdf"
+    )
+    assert not fisc.Site._is_official_court_pdf(
+        "https://www.fisc.uscourts.gov/public-filings/opinion"
+    )
+
+
+def test_official_court_table_paginates_filters_and_deduplicates():
+    first_url = (
+        "https://www.fisc.uscourts.gov/sites/default/files/"
+        "Misc%2019-02%20Opinion.pdf"
+    )
+    second_url = (
+        "https://www.fisc.uscourts.gov/sites/default/files/"
+        "BR%2015-99%20Order.pdf"
+    )
+    fiscr_url = (
+        "https://www.fisc.uscourts.gov/sites/default/files/"
+        "FISCR%2020-01%20Opinion.pdf"
+    )
+    future = (date.today() + timedelta(days=1)).strftime("%a, %m/%d/%Y")
+    first_page = _court_page(
+        _court_row(
+            "Thu, 03/05/2020",
+            "Corrected Opinion and Order",
+            "Misc. 19-02",
+            "Misc 19-02 Opinion.pdf",
+            first_url,
+        ),
+        _court_row(
+            "Fri, 04/24/2020",
+            "Opinion",
+            "FISCR 20-01",
+            "FISCR 20-01 Opinion.pdf",
+            fiscr_url,
+        ),
+        _court_row(
+            "Wed, 05/17/2023",
+            "Motion for Relief from the Court's Order",
+            "Misc. 19-02",
+            "Motion.pdf",
+            "https://www.fisc.uscourts.gov/sites/default/files/Motion.pdf",
+        ),
+        next_url="/public-filings?page=1",
+    )
+    second_page = _court_page(
+        _court_row(
+            "Tue, 11/24/2015",
+            "Opinion and Order",
+            "BR 15-99",
+            "BR 15-99 Order.pdf",
+            second_url,
+        ),
+        _court_row(
+            "Thu, 03/05/2020",
+            "Corrected Opinion and Order",
+            "Misc. 19-02",
+            "Misc 19-02 Opinion.pdf",
+            first_url,
+        ),
+        _court_row(
+            future,
+            "Order",
+            "Misc. 30-01",
+            "Future Order.pdf",
+            "https://www.fisc.uscourts.gov/sites/default/files/Future.pdf",
+        ),
+    )
+    empty_search = "<html><body><ul></ul></body></html>"
+
+    def handler(request):
+        if request.url.path.endswith("/advanced-search"):
+            return httpx.Response(200, text=empty_search, request=request)
+        body = (
+            second_page
+            if request.url.params.get("page") == "1"
+            else first_page
+        )
+        return httpx.Response(200, text=body, request=request)
+
+    async def parse(site_class):
+        site = site_class(transport=httpx.MockTransport(handler))
+        try:
+            await site.parse()
+            return site
+        finally:
+            await site.close_session()
+
+    fisc_site = asyncio.run(parse(fisc.Site))
+    fiscr_site = asyncio.run(parse(fiscr.Site))
+
+    assert fisc_site.case_names == (
+        "Corrected Opinion and Order",
+        "Opinion and Order",
+    )
+    assert fisc_site.case_dates == (date(2020, 3, 5), date(2015, 11, 24))
+    assert fisc_site.docket_numbers == ("Misc. 19-02", "BR 15-99")
+    assert fisc_site.download_urls == (first_url, second_url)
+    assert fisc_site.date_filed_is_approximate == (False, False)
+
+    assert fiscr_site.case_names == ("Opinion",)
+    assert fiscr_site.case_dates == (date(2020, 4, 24),)
+    assert fiscr_site.docket_numbers == ("FISCR 20-01",)
+    assert fiscr_site.download_urls == (fiscr_url,)
+
+
+def test_union_deduplication_prefers_court_and_normalizes_filenames():
+    court_url = (
+        "https://www.fisc.uscourts.gov/sites/default/files/"
+        "FISCR%20Opinion%2016-01.pdf"
+    )
+    archive_duplicate = (
+        "https://www.intelligence.gov/assets/declassified/"
+        "FISCR%20Opinion%2016-01.pdf"
+    )
+    archive_unique = (
+        "https://www.intelligence.gov/assets/declassified/"
+        "2023_FISC-R_ECSP_Opinion.pdf"
+    )
+    records = [
+        {
+            "date": "2016-04-14",
+            "name": "Opinion",
+            "docket": "FISCR 16-01",
+            "url": court_url,
+        },
+        {
+            "date": "2016-04-14",
+            "name": "FISCR's April 14, 2016 Opinion",
+            "docket": "Redacted",
+            "url": archive_duplicate,
+        },
+        {
+            "date": "2023-01-01",
+            "name": "2023 FISC-R ECSP Opinion",
+            "docket": "Redacted",
+            "url": archive_unique,
+        },
+    ]
+
+    assert fiscr.Site._deduplicate_records(records) == [records[0], records[2]]
+
+
+def test_malformed_rows_and_external_files_are_ignored():
+    site = fisc.Site()
+    page = _court_page(
+        "<tr><td>Thu, 03/05/2020</td></tr>",
+        _court_row(
+            "Thu, 03/05/2020",
+            "Opinion and Order",
+            "Misc. 19-02",
+            "Opinion.pdf",
+            "https://example.com/Opinion.pdf",
+        ),
+    )
+    records = []
+
+    site._collect_court_page(html.fromstring(page), records, set())
+
+    assert records == []

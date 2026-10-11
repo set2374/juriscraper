@@ -2,40 +2,76 @@
 
 ## Native-Code-First Review:
 
-- Need: Restore current FISC and FISCR decision discovery after the court
-  listing began rejecting the production source host.
-- Search: Inspected `fisc.py`, `fiscr.py`, `AbstractSite.py`, `OpinionSiteLinear.py`, installed site-packages for httpx and lxml, dependency declarations in `pyproject.toml`, the provider corpus, official court dockets, and official Intelligence Community search, RSS, release pages, and PDFs from EX131.
-- Native option: Reuse the installed `OpinionSiteLinear` and `AbstractSite` async HTTP client, lxml parser, linear case contract, and approximate-date field; no new dependency or HTTP implementation is needed.
-- Gap: The old modules read only the blocked court listing. The provider corpus
-  ends in 2016 for FISC and 2008 for FISCR. The official RSS exposes only ten
-  recent entries, and the Intelligence Community search omits published 2018
-  and 2020 FISCR orders and opinions that remain available as official PDFs.
-- Decision: Extend the two native opinion modules. Walk the official paginated
-  HTML search, follow its native release links, and conserve the bounded set of
-  verified split-source FISCR records in the FISCR module itself.
-- Duplication check: This extends the existing court modules and creates no parallel scraper, loader, service, ingestion path, parser stack, or HTTP client.
+Reuse Review:
+
+- Need: Give the existing FISC and FISCR opinion modules complete, downloadable
+  official opinions and orders for nightly ingestion.
+- Search: Inspected `fisc.py`, `fiscr.py`, `AbstractSite.py`, and installed dependencies declared in `pyproject.toml`,
+  `OpinionSiteLinear.py`, the provider corpus, the Intelligence Community
+  search, and every page and PDF link in the court's public-filings table from
+  EX131.
+- Native option: Reuse the existing court modules, their async HTTP client,
+  lxml parsing, linear case contract, and the court's native paginated table.
+- Gap: The court's public-filings table supplies exact filed dates, dockets,
+  titles, and direct PDFs for recent records, but it omits older and
+  certification opinions retained by the Intelligence Community archive. The
+  archive's assets return PDF bytes to the ingestion host only when the
+  existing Juriscraper special-header path identifies the client truthfully as
+  `Juriscraper`; generic client identifiers receive HTTP 403 HTML responses.
+- Decision: Configure and extend the two existing modules to union the two
+  official sources. Crawl
+  the court table through its native pagination, retain the archive's older
+  records, use Juriscraper's native special-header support, split FISC from
+  FISCR by docket/file identity, and admit only judicial opinions, orders,
+  decisions, and judgments with defensible dates.
+- Duplication check: This configures the two existing modules and their native
+  HTTP/header hooks. It creates no parallel scraper, loader, service, HTTP
+  client, or ingestion path.
 
 ## Root-Cause Review:
 
-- Symptom: Live production-host validation returned zero FISC/FISCR items while
-  public 2018-2025 decisions exist, and the provider contains only six FISC and
-  two FISCR clusters.
-- Root cause: The source invariant failed because the native scrapers depended exclusively on an official court listing that rejects the production host, while the reachable declassification source is archive-incomplete for post-2016 FISCR dockets.
-- Evidence: EX131 received the court-listing rejection; provider counts stopped
-  at 2016/2008; paginated Intelligence Community searches returned current
-  decision records; and ten omitted 2018/2020 court URLs returned HTTP 206,
-  `application/pdf`, and `%PDF` bytes from EX131.
-- Scope: The affected class is public FISC and FISCR judicial opinions and
-  orders exposed by the official declassification search or the verified
-  FISCR 18-01, FISCR 20-01, and FISCR Misc. 20-02 court records. Agency
-  procedures, assessments, pleadings, declarations, briefs, transcripts,
-  reports, and rule-administration documents remain excluded.
-- Fix strategy: Restore the source invariant inside the existing native modules by walking every reachable official search page, resolving native PDF redirects, adding only verified split-source court records, preserving docket/date metadata, and conserving each official URL once.
-- Date integrity: Prefer a decision date stated in the title or filename.
-  Month-only dates are marked approximate. Do not treat migrated HTTP
-  `Last-Modified` values as judicial filing dates. Skip a searchable record when
-  no defensible decision date exists until verified metadata is available.
-- Regression test: The unit test `tests/local/test_fisc_official_feed.py` covers court separation, excluded document classes, dates, alias deduplication, pagination, redirect repair, and supplemental metadata; the legacy HTML fixture and EX131 live canary cover boundary cases and PDF identity.
-- Blast radius: Only the two disabled federal-special modules change. They stay
-  disabled until their source-engine pin, live parse, corpus ingestion, and
-  registry identity are separately tested and deployed. Rollback is one commit.
+Root-Cause Review:
+
+- Symptom: The scraper reported 38 FISC and 13 FISCR records, but native
+  ingestion could download only ten manually listed FISCR PDFs. The other
+  archive assets returned HTTP 403 HTML under the controller's generic client
+  identifier and could not enter the opinion corpus.
+- Root cause: The underlying source-delivery invariant depends on the
+  requesting client identifier. The Intelligence Community asset server
+  conditions access on that identifier, and Juriscraper already supports per-source
+  special headers, but these modules did not enable that native path. The
+  court table alone was also insufficient because it omits older and
+  certification decisions that remain in the archive.
+- Evidence: EX131 verified all 18 court-table pages and 354 public filings. A
+  live combined-source canary returned 144 unique FISC records (110 court, 34
+  archive) and 14 unique FISCR records (12 court, two archive), spanning 2002
+  through 2025. Every one of the 158 selected URLs returned HTTP 200/206,
+  a PDF content type, and `%PDF` bytes with the truthful `Juriscraper` client
+  identifier. The same archive URLs returned HTTP 403 HTML with generic
+  `CourtListener` and browser client identifiers.
+- Scope: The affected class is official FISC and FISCR opinions, orders,
+  decisions, and judgments published in either official surface. The court
+  table covers public filings since June 2013; the archive extends the selected
+  corpus to 2002 and includes certification opinions absent from the table.
+  Motions, briefs, responses, notices, letters, petitions, applications,
+  submissions, declarations, reports, transcripts, and procedures are not
+  judicial decisions and remain excluded even when their titles mention an
+  opinion or order.
+- Fix strategy: Repair the source invariant by parsing the authoritative court
+  row fields, preserving archive metadata for complementary records, and requesting archive assets through the
+  native truthful-header hook, require official PDF hosts and paths,
+  deduplicate by canonical filename and court-preferred overlap, exclude
+  future or unsupported dates, and fail visibly if either source cannot be
+  fetched.
+- Regression test: Unit tests in `tests/local/test_fisc_official_feed.py` cover pagination,
+  direct-PDF admission, court separation, false-positive party filings,
+  duplicate conservation, malformed rows, and future dates. The saved fixture
+  confirms that a response merely mentioning opinions and orders is excluded.
+- Blast radius: Only the two federal-special opinion modules and their existing
+  fixtures change. Rollback is one commit; no corpus, watermark, or service is
+  mutated by the source change itself.
+
+Some official archive files still lack a source-supported judicial date. They
+remain excluded rather than inheriting an HTTP timestamp or a guessed date.
+That fail-closed set is a known completeness gap for later source-supported
+reconciliation; it does not reduce the 158 records verified by this change.
