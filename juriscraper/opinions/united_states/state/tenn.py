@@ -56,14 +56,26 @@ class Site(ClusterSite):
             section = row.xpath(
                 f".//td[contains(@class, '{self.section_selector}')]"
             )[0]
-            url = section.xpath(".//a")[0].get("href")
+            opinion_links = [
+                link
+                for link in section.xpath(".//a")
+                if (link.get("href") or "").strip()
+                and (link.get("href") or "").strip() != self.url
+            ]
+            if not opinion_links:
+                logger.warning(
+                    "Skipping Tennessee opinion row without a document URL"
+                )
+                continue
+            opinion_link = opinion_links[0]
+            url = opinion_link.get("href").strip()
 
             summary = self.get_summary(section)
             # prevent picking up one of the judge containers
             if "Judge:" in summary:
                 summary = ""
 
-            name_text = section.xpath(".//a")[0].text_content()
+            name_text = opinion_link.text_content()
             name, opinion_type = self.extract_type(name_text, summary)
 
             # may be empty
