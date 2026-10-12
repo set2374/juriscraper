@@ -1,50 +1,13 @@
 [
   {
-    "case_dates": "2026-06-17",
-    "case_names": "John Hoth v. Stacey Hoth",
-    "download_urls": "https://govt.westlaw.com/akcases/Document/Ia6205b406ad611f1aec1b023793e4536?viewType=FullText&bhcp=1",
-    "precedential_statuses": "Unpublished",
-    "blocked_statuses": false,
-    "date_filed_is_approximate": false,
-    "docket_numbers": "S-19249",
-    "citations": "2026 WL 1747278",
-    "parallel_citations": "",
-    "case_name_shorts": ""
-  },
-  {
-    "case_dates": "2026-06-17",
-    "case_names": "Crystal Schachle v. Seth Schachle",
-    "download_urls": "https://govt.westlaw.com/akcases/Document/Ie99553706ad211f19e7fe70c54612d80?viewType=FullText&bhcp=1",
-    "precedential_statuses": "Unpublished",
-    "blocked_statuses": false,
-    "date_filed_is_approximate": false,
-    "docket_numbers": "S-19400",
-    "citations": "2026 WL 1747174",
-    "parallel_citations": "",
-    "case_name_shorts": ""
-  },
-  {
-    "case_dates": "2026-06-12",
-    "case_names": "Ruby C. v. Department of Family & Community Services",
-    "download_urls": "https://govt.westlaw.com/akcases/Document/I3fa3ad00668911f1a96a997121209356?viewType=FullText&bhcp=1",
+    "case_dates": "2026-10-09",
+    "case_names": "Dash D. (Father) v. State of Alaska, DFCS, OCS",
+    "download_urls": "https://appellate-records.courts.alaska.gov/CMSPublic/UserControl/OpenOpinionDocument?q=supreme-published",
     "precedential_statuses": "Published",
     "blocked_statuses": false,
     "date_filed_is_approximate": false,
-    "docket_numbers": "S-19535, S-19536",
-    "citations": "2026 WL 1700838",
-    "parallel_citations": "",
+    "docket_numbers": "S19641",
+    "citations": "600 P.3d 1",
     "case_name_shorts": ""
-  },
-  {
-    "case_dates": "2026-06-05",
-    "case_names": "Humphrey v. Reges",
-    "download_urls": "https://govt.westlaw.com/akcases/Document/I02d25e10611311f1a652f2fcf456c0be?viewType=FullText&bhcp=1",
-    "precedential_statuses": "Published",
-    "blocked_statuses": false,
-    "date_filed_is_approximate": false,
-    "docket_numbers": "S-19351",
-    "citations": "2026 WL 1615971",
-    "parallel_citations": "",
-    "case_name_shorts": "Humphrey"
   }
 ]

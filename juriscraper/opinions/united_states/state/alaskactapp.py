@@ -1,13 +1,19 @@
-"""Scraper for the Alaska Court of Appeals
+"""Scraper for the Alaska Court of Appeals.
 CourtID: alaskactapp
 Court Short Name: Alaska Ct. App.
 
-The Court of Appeals shares the Westlaw "Alaska Case Law Service" search feed
-with the Supreme Court; we filter to its court label. See alaska.py and #2009.
+The Court of Appeals shares the Alaska Court System native publication surface
+with the Supreme Court. See alaska.py.
 """
 
 from juriscraper.opinions.united_states.state import alaska
 
 
 class Site(alaska.Site):
-    court_label = "Alaska App."
+    source_pages: tuple[tuple[str, str], ...] = (
+        ("Home/Opinions?isCOA=True", "Published"),
+        ("Home/MOJOpinions?isCOA=True", "Unpublished"),
+        ("Home/SummaryDispositions?isCOA=True", "Unpublished"),
+        ("Home/BailOrders", "Unpublished"),
+        ("Home/CaseRelatedOrders", "Unpublished"),
+    )
