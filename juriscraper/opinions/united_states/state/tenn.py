@@ -14,6 +14,7 @@ from typing_extensions import override
 from juriscraper.AbstractSite import logger
 from juriscraper.ClusterSite import ClusterSite
 from juriscraper.lib.type_utils import OpinionType
+from juriscraper.OpinionSite import ExtractedMetaData
 
 
 class Site(ClusterSite):
@@ -68,6 +69,7 @@ class Site(ClusterSite):
                 )
                 continue
             opinion_link = opinion_links[0]
+            docket = section.xpath(self.docket_xpath)[0].strip()
             url = opinion_link.get("href").strip()
 
             summary = self.get_summary(section)
@@ -102,7 +104,7 @@ class Site(ClusterSite):
                 "date": date,
                 "url": url,
                 "name": name.strip(),
-                "docket": section.xpath(self.docket_xpath)[0].strip(),
+                "docket": docket,
                 "judge": judge,
                 "author": judge,
                 "lower_court_judge": lower_court_judge or "",
@@ -120,7 +122,8 @@ class Site(ClusterSite):
 
             self.cases.append(case_dict)
 
-    def extract_from_text(self, scraped_text: str) -> dict:
+    @override
+    def extract_from_text(self, scraped_text: str) -> ExtractedMetaData:
         """Extract precedential_status and appeal_from_str from scraped text.
 
         :param scraped_text: Text of the scraped content
@@ -132,7 +135,7 @@ class Site(ClusterSite):
             if "MEMORANDUM OPINION" not in scraped_text
             else "Unpublished"
         )
-        result = {
+        result: ExtractedMetaData = {
             "OpinionCluster": {"precedential_status": precedential_status}
         }
         if lower_court:

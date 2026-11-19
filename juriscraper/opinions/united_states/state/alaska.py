@@ -17,6 +17,7 @@ from dateutil import parser
 from typing_extensions import override
 
 from juriscraper.AbstractSite import logger
+from juriscraper.OpinionSite import ExtractedMetaData
 from juriscraper.OpinionSiteLinear import OpinionSiteLinear
 
 
@@ -191,9 +192,10 @@ class Site(OpinionSiteLinear):
         self.downloader_executed = True
         await self.parse()
 
-    def extract_from_text(self, scraped_text: str) -> dict:
+    @override
+    def extract_from_text(self, scraped_text: str) -> ExtractedMetaData:
         """Extract lower-court and panel metadata from an Alaska decision."""
-        metadata = {}
+        metadata: ExtractedMetaData = {}
 
         lower_court_str = ""
         if match := self.lower_court_regex.search(scraped_text):

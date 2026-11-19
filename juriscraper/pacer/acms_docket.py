@@ -4,7 +4,8 @@ import re
 import sys
 from collections import OrderedDict
 
-from requests import Response
+from httpx import Response
+from typing_extensions import override
 
 from juriscraper.lib.html_utils import strip_bad_html_tags_insecure
 from juriscraper.lib.log_tools import make_default_logger
@@ -19,12 +20,15 @@ logger = make_default_logger()
 class ACMSDocketReport(AppellateDocketReport):
     """Parse ACMS docket JSON."""
 
-    def __init__(self, court_id, pacer_session=None):
+    def __init__(self, court_id: str, pacer_session=None):
         super().__init__(court_id, pacer_session)
-        self._acms_json = None
-        self.api_client = AcmsApiClient(pacer_session, court_id)
+        self._acms_json: dict | None = None
+        self.api_client: AcmsApiClient | None = None
+        if pacer_session is not None:
+            self.api_client = AcmsApiClient(pacer_session, court_id)
 
-    def _parse_text(self, text):
+    @override
+    def _parse_text(self, text: str) -> None:
         """Store the ACMS JSON
 
         This does not, in fact, actually *parse* the data, it
@@ -36,20 +40,20 @@ class ACMSDocketReport(AppellateDocketReport):
         """
         self._acms_json = json.loads(text)
 
-    def query(self, case_id: str):
+    async def query(self, case_id: str):
         """
         Queries the court API for case and docket details for a given case ID.
 
         :param case_id: The unique identifier of the case to query.
         """
-        assert self.session is not None, (
-            "session attribute of AppellateDocketReport cannot be None."
-        )
+        if self.api_client is None:
+            raise AssertionError("session attribute cannot be None.")
+
         # Fetch Case Details
-        case_data = self.api_client.get_case_details(case_id)
+        case_data = await self.api_client.get_case_details(case_id)
 
         # Fetch Docket Entry Details
-        entry_details = self.api_client.get_docket_entries(case_id)
+        entry_details = await self.api_client.get_docket_entries(case_id)
 
         # Combine and store results
         self._acms_json = {
@@ -57,7 +61,7 @@ class ACMSDocketReport(AppellateDocketReport):
             "docketInfo": entry_details,
         }
 
-    def download_pdf(
+    async def download_pdf(
         self, entry_id: str, doc_id: str
     ) -> tuple[Response | None, str]:
         """
@@ -77,8 +81,11 @@ class ACMSDocketReport(AppellateDocketReport):
                 - An error message string if an issue occurred, otherwise an
                  empty string.
         """
+        if self.api_client is None:
+            raise AssertionError("session attribute cannot be None.")
+
         # Fetch all documents for given entry
-        attachment_list = self.api_client.get_attachments(
+        attachment_list = await self.api_client.get_attachments(
             entry_id, False, False
         )
         if not attachment_list:
@@ -106,7 +113,7 @@ class ACMSDocketReport(AppellateDocketReport):
             if not doc_data:
                 return None, f"Document ID '{doc_id}' not found in this entry."
 
-        r = self.api_client.download_pdf(
+        r = await self.api_client.download_pdf(
             doc_data["docketDocumentDetailsId"],
             doc_data["pageCount"],
             doc_data["documentUrl"],
@@ -119,6 +126,8 @@ class ACMSDocketReport(AppellateDocketReport):
 
         That function then supplements it with parties and docket entries.
         """
+        if self._acms_json is None:
+            raise AssertionError("_acms_json is absent.")
 
         caseDetails = self._acms_json["caseDetails"]
 
@@ -334,6 +343,8 @@ class ACMSDocketReport(AppellateDocketReport):
         # Within that, the first <td> is the party name.
         # The second <td> is the atty list.
         # Within the atty list, there is one <div> per attorney.
+        if self._acms_json is None:
+            raise AssertionError("_acms_json is absent.")
 
         parties_html = self._acms_json["caseDetails"]["partyAttorneyList"]
         tree = strip_bad_html_tags_insecure(parties_html)
@@ -363,7 +374,9 @@ class ACMSDocketReport(AppellateDocketReport):
         for party in parties:
             for attorney in party.get("attorneys", []):
                 if re.search(r"see\s+above", attorney.get("attorneys", "")):
-                    assert "Unexpected SEE ABOVE found in ACMS attorney list"
+                    raise AssertionError(
+                        "Unexpected SEE ABOVE found in ACMS attorney list"
+                    )
 
         return parties
 
@@ -384,6 +397,8 @@ class ACMSDocketReport(AppellateDocketReport):
         to the HTML markup we would otherwise lose.
 
         """
+        if self._acms_json is None:
+            raise AssertionError("_acms_json is absent.")
 
         docket_entries = []
         for row in self._acms_json["docketInfo"]["docketEntries"]:

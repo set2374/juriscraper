@@ -1,5 +1,5 @@
+from httpx import AsyncClient, Timeout
 from lxml import etree
-from requests import Session
 
 from juriscraper.lib.judge_parsers import normalize_judge_string
 from juriscraper.lib.log_tools import make_default_logger
@@ -24,7 +24,7 @@ class InternetArchive(BaseDocketReport):
 
     CACHE_ATTRS = ["metadata", "parties", "docket_entries"]
 
-    def __init__(self, court_id):
+    def __init__(self, court_id: str, **kwargs):
         super().__init__(court_id)
 
         # Initialize the empty cache properties.
@@ -32,25 +32,31 @@ class InternetArchive(BaseDocketReport):
         self._metadata = None
         self._parties = None
         self._docket_entries = None
-
-        self.session = Session()
+        kwargs.setdefault("http2", True)
+        kwargs.setdefault("follow_redirects", True)
+        self.session = AsyncClient(**kwargs)
         self.response = None
         self.tree = None
         self.parser = etree.XMLParser(recover=True)
         self.is_valid = True
 
-    def __del__(self):
-        if self.session:
-            self.session.close()
+    async def __aenter__(self):
+        await self.session.__aenter__()
+        return self
 
-    def download_pdf(self, pacer_case_id, document_number, attachment_number):
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.session.__aexit__(exc_type, exc_value, traceback)
+
+    async def download_pdf(
+        self, pacer_case_id, document_number, attachment_number
+    ):
         """Download a PDF from the Internet Archive"""
-        timeout = (60, 300)
+        timeout = Timeout(60, read=300)
         url = get_pdf_url(
             self.court_id, pacer_case_id, document_number, attachment_number
         )
         logger.info("GETting PDF at URL: %s")
-        r = self.session.get(url, timeout=timeout)
+        r = await self.session.get(url, timeout=timeout)
         r.raise_for_status()
         if not is_pdf(r):
             logger.error(f"Got non-PDF data, but expected a PDF at: {url}")
@@ -58,12 +64,12 @@ class InternetArchive(BaseDocketReport):
         else:
             return r
 
-    def query(self, pacer_case_id):
+    async def query(self, pacer_case_id):
         """Download a docket XML page from the Internet Archive"""
-        timeout = (60, 300)
+        timeout = Timeout(60, read=300)
         url = get_docketxml_url(self.court_id, pacer_case_id)
         logger.info("GETting docket XML at URL: %s")
-        r = self.session.get(url, timeout=timeout)
+        r = await self.session.get(url, timeout=timeout)
         self.response = r
         self.parse()
 
@@ -73,7 +79,7 @@ class InternetArchive(BaseDocketReport):
         self.response.raise_for_status()
         self._parse_text(self.response.text)
 
-    def _parse_text(self, text):
+    def _parse_text(self, text: str) -> None:
         assert isinstance(text, str), (
             f"Input must be unicode, not {type(text)}"
         )
@@ -127,7 +133,7 @@ class InternetArchive(BaseDocketReport):
             if not name.strip():
                 # Happens in adversary proceedings? See cacb_1669936.xml.
                 continue
-            party = {
+            party: dict = {
                 "type": normalize_party_types(pt),
                 "name": name,
                 "extra_info": extra_info,
@@ -152,7 +158,7 @@ class InternetArchive(BaseDocketReport):
     def _get_attorneys(self, party_node):
         attorneys = []
         for atty_node in party_node.xpath("./attorney_list/attorney"):
-            attorney = {
+            attorney: dict = {
                 "name": self._xpath_text_0(atty_node, "./attorney_name"),
                 "contact": self._xpath_text_0(atty_node, "./contact"),
             }
