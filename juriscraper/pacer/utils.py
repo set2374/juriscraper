@@ -1,8 +1,8 @@
 import re
 from datetime import date, datetime
+from typing import TypedDict
 
-import requests
-import tldextract
+import httpx
 from dateutil import parser
 from dateutil.tz import gettz
 from lxml import html
@@ -431,12 +431,21 @@ def get_doc_id_prefix_from_court_id(court_id):
     return cid_to_prefix_map[court_id]
 
 
-def get_pacer_court_info():
-    r = requests.get("https://court-version-scraper.fly.dev/courts.json")
-    return r.json()
+async def get_pacer_court_info(
+    **kwargs,
+) -> dict[str, dict[str, list[dict[str, str]]]]:
+    kwargs.setdefault("http2", True)
+    kwargs.setdefault("follow_redirects", True)
+    async with httpx.AsyncClient(**kwargs) as client:
+        r = await client.get(
+            "https://court-version-scraper.fly.dev/courts.json"
+        )
+        return r.json()
 
 
-def get_courts_from_json(j):
+def get_courts_from_json(
+    j: dict[str, dict[str, list[dict[str, str]]]],
+) -> list[dict[str, str]]:
     courts = []
     for k, v in j.items():
         for court in v["courts"]:
@@ -447,11 +456,11 @@ def get_courts_from_json(j):
 
 def get_court_id_from_url(url):
     """Extract the court ID from the URL."""
-    parts = tldextract.extract(url)
-    return parts.subdomain.split(".")[1]
+    host = httpx.URL(url).host
+    return host.split(".")[1]
 
 
-def get_pacer_case_id_from_nonce_url(url):
+def get_pacer_case_id_from_nonce_url(url) -> str:
     """Extract the pacer case ID from the URL.
 
     In: https://ecf.almd.uscourts.gov/cgi-bin/DktRpt.pl?56120
@@ -465,7 +474,7 @@ def get_pacer_case_id_from_nonce_url(url):
     return param
 
 
-def get_pacer_seq_no_from_doc1_url(url):
+def get_pacer_seq_no_from_doc1_url(url) -> str | None:
     """Extract the seq_no from the doc1 URL."""
     match = re.search(r"de_seq_num=(\d+)", url)
     if match:
@@ -474,7 +483,7 @@ def get_pacer_seq_no_from_doc1_url(url):
         return None
 
 
-def get_pacer_case_id_from_doc1_url(url):
+def get_pacer_case_id_from_doc1_url(url) -> str | None:
     """Extract the caseid from the doc1 URL."""
     match = re.search(r"caseid=(\d+)", url)
     if match:
@@ -551,7 +560,18 @@ def get_pacer_seq_no_from_doc1_anchor(anchor):
             return go_dls_parts["de_seq_num"]
 
 
-def reverse_goDLS_function(s):
+class GoDLSArguments(TypedDict):
+    form_post_url: str
+    caseid: str
+    de_seq_num: str
+    got_receipt: str
+    pdf_header: str
+    pdf_toggle_possible: str
+    magic_num: str
+    hdr: str | None
+
+
+def reverse_goDLS_function(s: str) -> GoDLSArguments:
     """Extract the arguments from the goDLS JavaScript function.
 
     In: goDLS('/doc1/01712427473','56121','69','','','1','','');return(false);
@@ -590,7 +610,7 @@ def reverse_goDLS_function(s):
        after 2010. Dockets older than that date only have seven responses.
     """
     args = re.findall("'(.*?)'", s)
-    parts = {
+    return {
         "form_post_url": args[0],
         "caseid": args[1],
         "de_seq_num": args[2],
@@ -598,16 +618,18 @@ def reverse_goDLS_function(s):
         "pdf_header": args[4],
         "pdf_toggle_possible": args[5],
         "magic_num": args[6],
-    }
-    try:
-        parts["hdr"] = args[7]
-    except IndexError:
         # At some point dockets added this eighth parameter. Older ones lack it
-        parts["hdr"] = None
-    return parts
+        "hdr": args[7] if len(args) > 7 else None,
+    }
 
 
-def reverse_sumDocSelected_function(s) -> dict[str, int] | None:
+class SumDocSelectedArguments(TypedDict):
+    page_count: int
+    file_size_bytes: int
+    doc_id: int
+
+
+def reverse_sumDocSelected_function(s: str) -> SumDocSelectedArguments | None:
     """Extract the arguments from the sumDocSelected JavaScript function.
 
     In: sumDocSelected(this,1,13481, 7548050)
@@ -627,18 +649,21 @@ def reverse_sumDocSelected_function(s) -> dict[str, int] | None:
     args = [arg.strip() for arg in match.group(1).split(",")]
     if args[0] != "this":
         return None
-    parts = {
+    return {
         "page_count": int(args[1]),
         "file_size_bytes": int(args[2]),
         "doc_id": int(args[3]),
     }
-    return parts
 
 
-def make_doc1_url(court_id, pacer_doc_id, skip_attachment_page):
+def make_doc1_url(
+    court_id: str | None, pacer_doc_id: str, skip_attachment_page: bool
+) -> str:
     """Make a doc1 URL.
 
-    If skip_attachment_page is True, we replace the fourth digit with a 1
+    :param court_id: The court ID.
+    :param pacer_doc_id: The PACER document ID.
+    :param skip_attachment_page: if True, we replace the fourth digit with a 1
     instead of a zero, which bypasses the attachment page.
     """
     if skip_attachment_page and pacer_doc_id[3] == "0":
@@ -664,12 +689,14 @@ def make_doc1_url(court_id, pacer_doc_id, skip_attachment_page):
 
 
 def make_docs1_url(
-    court_id: str | None, pacer_doc_id: str, skip_attachment_page
+    court_id: str | None, pacer_doc_id: str, skip_attachment_page: bool
 ) -> str:
     """Make a docs1 URL for NDAs free look downloads.
 
     :param court_id: The court ID.
     :param pacer_doc_id: The PACER document ID.
+    :param skip_attachment_page: if True, we replace the fourth digit with a 1
+    instead of a zero, which bypasses the attachment page.
     """
     if skip_attachment_page and pacer_doc_id[3] == "0":
         # If the fourth digit is a 0, replace it with a 1
@@ -702,17 +729,17 @@ def make_acms_free_doc_url(court_id: str, pacer_magic_num: str) -> str:
     return f"https://{court_id}-showdoc.azurewebsites.us/NDA/{pacer_magic_num}"
 
 
-def is_pdf(response):
+def is_pdf(response) -> bool:
     """Determines whether the item downloaded is a PDF or something else."""
     return response.headers.get("content-type") == "application/pdf"
 
 
-def is_text(response):
+def is_text(response) -> bool:
     """Determines whether the item downloaded is a text file or something else."""
     return ".txt" in response.headers.get("content-type", "")
 
 
-def get_nonce_from_form(r):
+def get_nonce_from_form(r) -> str | None:
     """Get a nonce value from a HTML response. Returns the first nonce that is
     found.
 
@@ -848,7 +875,7 @@ def parse_datetime_for_us_timezone(datetime_str: str) -> datetime:
 
 def parse_sumDocSelected_from_row(
     row: html.HtmlElement,
-) -> dict[str, int] | None:
+) -> SumDocSelectedArguments | None:
     """Parse the arguments from the sumDocSelected function call parts from a
     given table row.
 

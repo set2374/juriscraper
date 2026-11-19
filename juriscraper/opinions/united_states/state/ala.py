@@ -63,8 +63,10 @@ class Site(OpinionSiteLinear):
             if not publicationItem.get("documents", []):
                 continue
 
-            # Only process actual opinions, skip orders. The court renamed
-            # "Opinion" to "Published Opinion" in Sept 2026
+            # Only process actual opinions, skip orders. The document name
+            # has several forms. "Opinion", "Published Opinion" and
+            # "Decision" are all in use, so match the word instead of the
+            # exact string.
             if not re.search(
                 r"\b(Opinion|Decision)\b",
                 publicationItem["documents"][0]["documentName"],
@@ -134,7 +136,8 @@ class Site(OpinionSiteLinear):
         await self._download()
         self._process_html()
 
-    def make_backscrape_iterable(self, kwargs: dict):
+    @override
+    def make_backscrape_iterable(self, kwargs: dict) -> None:
         """Checks if backscrape start and end arguments have been passed"""
         start = kwargs.get("backscrape_start")
         end = kwargs.get("backscrape_end")
